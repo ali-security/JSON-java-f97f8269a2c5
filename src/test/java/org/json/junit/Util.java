@@ -117,4 +117,37 @@ public class Util {
             );
         }
     }
+
+    /**
+     * Runs the given code on a new thread that has a large (8 MB) stack and
+     * reports what it threw. Tests that feed deeply nested documents to a
+     * parser use this so that their outcome does not depend on the stack size
+     * of the JVM running the tests, which may be run with a small stack (for
+     * example -Xss512k).
+     * @param runnable the code to run
+     * @return the Throwable thrown by the runnable, or null if it completed
+     *  normally
+     */
+    public static Throwable throwableFromLargeStack(final Runnable runnable) {
+        final Throwable[] thrown = new Throwable[1];
+        Thread thread = new Thread(null, new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    runnable.run();
+                } catch (Throwable t) {
+                    thrown[0] = t;
+                }
+            }
+        }, "large-stack-test", 8L * 1024L * 1024L);
+        thread.start();
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Interrupted while waiting for the large-stack thread", e);
+        }
+        return thrown[0];
+    }
 }
